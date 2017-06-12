@@ -39,7 +39,8 @@ namespace WindowsFormsApp1
 
         private void openFileDialog1_FileOk(object sender, CancelEventArgs e)
         {
-            if(Reader!=null)
+            #region Clear
+            if (Reader != null)
             {
                 Reader.Close();
                 Reader.Dispose();
@@ -51,18 +52,40 @@ namespace WindowsFormsApp1
             TJ16Percent.Clear();
             TJ16.Clear();
             listBox1.Items.Clear();
-
+            toolStripLabel1.Text = toolStripLabel1.Text.Replace("ДА", "НЕТ");
+            toolStripLabel2.Text = toolStripLabel2.Text.Replace("ДА", "НЕТ");
+            toolStripLabel3.Text = toolStripLabel3.Text.Replace("ДА", "НЕТ");
+            toolStripLabel4.Text = toolStripLabel4.Text.Replace("ДА", "НЕТ");
+            toolStripLabel5.Text = toolStripLabel5.Text.Replace("ДА", "НЕТ");
+            toolStripLabel1.BackColor = Color.OrangeRed;
+            toolStripLabel2.BackColor = Color.OrangeRed;
+            toolStripLabel3.BackColor = Color.OrangeRed;
+            toolStripLabel4.BackColor = Color.OrangeRed;
+            toolStripLabel5.BackColor = Color.OrangeRed; 
+            #endregion
 
             PdfBytes = new byte[Reader.SafeFile.Length];
             Reader.SafeFile.ReadFully(PdfBytes);
             PdfChars = PdfBytes.ToCharArray();
+            if(PdfChars.IndexOfSubArray("FileAttachment".ToCharArray())>-1)
+            {
+                toolStripLabel2.Text = "FileAttachment: ДА";
+                toolStripLabel2.BackColor = Color.ForestGreen;
+            }
+            if (PdfChars.IndexOfSubArray("Image".ToCharArray()) > -1)
+            {
+                toolStripLabel5.Text = "Изображения: ДА";
+                toolStripLabel5.BackColor = Color.ForestGreen;
+            }
             if (!CheckEof(PdfChars))
             {
                 toolStripLabel3.Text = $"Данные после EOF: ДА";
+                toolStripLabel3.BackColor = Color.ForestGreen;
             }
             if(!CheckDataBetweenObjects())
             {
                 toolStripLabel4.Text = $"Данные между объектами: ДА";
+                toolStripLabel4.BackColor = Color.ForestGreen;
             }
             PdfObject obj;
             for (int i = 1; i <= Reader.XrefSize; i++)
@@ -91,19 +114,14 @@ namespace WindowsFormsApp1
                         if (dict.Get(PdfName.JAVASCRIPT) != null)
                         {
                             toolStripLabel1.Text = "Javascript: ДА";
+                            toolStripLabel1.BackColor = Color.ForestGreen;
+
                         }
 
-                        if (dict.Get(PdfName.IMAGE) != null)
-                        {
-                            toolStripLabel1.Text = "Изображения: ДА";
-                        }
+                       
+                        
 
-                        if (dict.Get(PdfName.EMBEDDEDFILE) != null
-                            || dict.Get(PdfName.EMBEDDED) != null
-                            || dict.Get(PdfName.EMBEDDEDFILES) != null)
-                        {
-                            toolStripLabel2.Text = "Embedded: ДА";
-                        }
+                        
                     }
 
 
@@ -140,9 +158,16 @@ namespace WindowsFormsApp1
         {
             char[] eof = { '%', '%', 'E', 'O', 'F' };
             if (pdfChars.Length < eof.Length) return false;
+            int ignoreCnt = 0;
+            char[] ignore = { '\r', '\n' };
+            for(long i=pdfChars.LongLength-1; i>=0; i--)
+            {
+                if (!ignore.Contains(pdfChars[i])) break;
+                ignoreCnt++;
+            }
             for (int i = 1; i <= eof.Length; i++)
             {
-                if (pdfChars[pdfChars.LongLength - i] != eof[eof.Length - i])
+                if (pdfChars[pdfChars.LongLength - i-ignoreCnt] != eof[eof.Length - i])
                 {
                     return false;
                 }
