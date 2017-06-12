@@ -24,6 +24,9 @@ namespace WindowsFormsApp1
         Dictionary<int, int> TJ16 = new Dictionary<int, int>();
         Dictionary<int, double> TJ16Percent = new Dictionary<int, double>();
 
+        PdfReader Reader;
+        
+
         public Form1()
         {
             InitializeComponent();
@@ -36,15 +39,22 @@ namespace WindowsFormsApp1
 
         private void openFileDialog1_FileOk(object sender, CancelEventArgs e)
         {
-            PdfReader reader = new PdfReader(openFileDialog1.FileName);
-            toolStripStatusLabel1.Text = $"Версия PDF: 1.{reader.PdfVersion.ToString()}";
-            richTextBox1.Text = reader.JavaScript;
+            if(Reader!=null)
+            {
+                Reader.Close();
+                Reader.Dispose();
+            }
+            Reader = new PdfReader(openFileDialog1.FileName);
+            toolStripStatusLabel1.Text = $"Версия PDF: 1.{Reader.PdfVersion.ToString()}   ";
+            toolStripStatusLabel2.Text = $"Размер {Reader.FileLength} байт";
+            richTextBox1.Text = Reader.JavaScript;
             TJ16Percent.Clear();
             TJ16.Clear();
+            listBox1.Items.Clear();
 
 
-            PdfBytes = new byte[reader.SafeFile.Length];
-            reader.SafeFile.ReadFully(PdfBytes);
+            PdfBytes = new byte[Reader.SafeFile.Length];
+            Reader.SafeFile.ReadFully(PdfBytes);
             PdfChars = PdfBytes.ToCharArray();
             if (!CheckEof(PdfChars))
             {
@@ -55,32 +65,23 @@ namespace WindowsFormsApp1
                 toolStripLabel4.Text = $"Данные между объектами: ДА";
             }
             PdfObject obj;
-            listView1.Items.Clear();
-            for (int i = 1; i <= reader.XrefSize; i++)
+            for (int i = 1; i <= Reader.XrefSize; i++)
             {
-                obj = reader.GetPdfObject(i);
+                obj = Reader.GetPdfObject(i);
                 if (obj != null)
                 {
-
+                    listBox1.Items.Add(new PdfObjectWrapper(obj));
+                    
                     if (obj.IsStream())
                     {
-                        PRStream stream = (PRStream)obj;
-                        byte[] b;
-                        try
-                        {
-                            b = PdfReader.GetStreamBytes(stream);
-                        }
-                        catch (UnsupportedPdfException)
-                        {
-                            b = PdfReader.GetStreamBytesRaw(stream);
-                        }
-                        string objStr = new string(b.ToCharArray());
+                        string objStr = PdfObjectContents(obj);
                         richTextBox3.AppendText(objStr);
-                        foreach(var integer in objStr.ExtractIntegers().Where(h=>Math.Abs(h)<=16))
+                        foreach(var integer in objStr.ExtractIntegers())
                         {
                             if (!TJ16.ContainsKey(integer)) TJ16.Add(integer, 0);
                             TJ16[integer]++;
                         }
+
                     }
 
                     if (obj.IsDictionary())
@@ -90,6 +91,11 @@ namespace WindowsFormsApp1
                         if (dict.Get(PdfName.JAVASCRIPT) != null)
                         {
                             toolStripLabel1.Text = "Javascript: ДА";
+                        }
+
+                        if (dict.Get(PdfName.IMAGE) != null)
+                        {
+                            toolStripLabel1.Text = "Изображения: ДА";
                         }
 
                         if (dict.Get(PdfName.EMBEDDEDFILE) != null
@@ -103,22 +109,9 @@ namespace WindowsFormsApp1
 
                 }
             }
-            reader.Close();
 
-            chart1.Series[0].XValueType = ChartValueType.Int32;
-            chart1.Series[0].YValueType = ChartValueType.Double;
-            double tj16sum = TJ16.Values.Sum();
-            foreach(var kvp in TJ16)
-            {
-                TJ16Percent.Add(kvp.Key, (double)kvp.Value / tj16sum);
-            }
-
-
-
-
-                chart1.Series[0].Points.DataBindXY(TJ16Percent.Keys, TJ16Percent.Values);
-            // richTextBox2.Text = File.ReadAllText(openFileDialog1.FileName);
-
+            TJDistribution(-16, 16);
+       
         }
 
         private bool CheckDataBetweenObjects()
@@ -157,6 +150,30 @@ namespace WindowsFormsApp1
             return true;
         }
 
+        private string PdfObjectContents(PdfObject obj)
+        {
+            if (obj.IsStream())
+            {
+                PRStream stream = (PRStream)obj;
+                byte[] b;
+                try
+                {
+                    b = PdfReader.GetStreamBytes(stream);
+                }
+                catch (UnsupportedPdfException)
+                {
+                    b = PdfReader.GetStreamBytesRaw(stream);
+                }
+                return new string(b.ToCharArray());
+            }
+
+            if (obj.IsDictionary())
+            {
+                PdfDictionary dict = (PdfDictionary)obj;
+            }
+                return "yet unsupported:(";
+        }
+
 
 
         private void toolStripButton1_Click(object sender, EventArgs e)
@@ -181,12 +198,40 @@ namespace WindowsFormsApp1
 
         private void Form1_Load(object sender, EventArgs e)
         {
-
+            chart1.Series[0].XValueType = ChartValueType.Int32;
+            chart1.Series[0].YValueType = ChartValueType.Double;
         }
 
         private void toolStripButton4_Click(object sender, EventArgs e)
         {
             richTextBox2.Text = PdfBytes.ToHexString();
+        }
+
+        private void listBox1_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            PdfObject obj = ((PdfObjectWrapper)listBox1.SelectedItem).PdfObject;
+            richTextBox4.Text = PdfObjectContents(obj);
+        }
+
+        private void numericUpDown1_ValueChanged(object sender, EventArgs e)
+        {
+            TJDistribution(numericUpDown1.Value, numericUpDown2.Value);
+        }
+
+        private void TJDistribution(decimal min, decimal max)
+        {
+            double tj16sum = TJ16.Where(h => h.Key >= min && h.Key <= max).Select(h=>h.Value).Sum();
+            TJ16Percent.Clear();
+            foreach (var kvp in TJ16.Where(h=>h.Key>=min&&h.Key<=max))
+            {
+                TJ16Percent.Add(kvp.Key, 100* (double)kvp.Value / tj16sum);
+            }
+            chart1.Series[0].Points.DataBindXY(TJ16Percent.Keys, TJ16Percent.Values);
+        }
+
+        private void numericUpDown2_ValueChanged(object sender, EventArgs e)
+        {
+            TJDistribution(numericUpDown1.Value, numericUpDown2.Value);
         }
     }
 }
