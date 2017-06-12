@@ -200,6 +200,7 @@ namespace WindowsFormsApp1
         {
             chart1.Series[0].XValueType = ChartValueType.Int32;
             chart1.Series[0].YValueType = ChartValueType.Double;
+            chart1.Series[0].IsValueShownAsLabel = true;
         }
 
         private void toolStripButton4_Click(object sender, EventArgs e)
