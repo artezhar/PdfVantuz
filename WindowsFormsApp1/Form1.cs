@@ -259,5 +259,25 @@ namespace WindowsFormsApp1
         {
             TJDistribution(numericUpDown1.Value, numericUpDown2.Value);
         }
+
+        private void button2_Click(object sender, EventArgs e)
+        {
+            saveFileDialog1.FileName = openFileDialog1.FileName + ".TJ.txt";
+            saveFileDialog1.ShowDialog();
+        }
+
+        private void saveFileDialog1_FileOk(object sender, CancelEventArgs e)
+        {
+            StringBuilder sb = new StringBuilder();
+            foreach(var kvp in TJ16)
+            {
+                if (kvp.Key >= 0) sb.Append(' ');
+                sb.Append(kvp.Key);
+                for (byte i = 0; i < 8 - Math.Floor(Math.Log10(Math.Abs(kvp.Key)) + 1); i++)
+                    sb.Append(' ');
+                sb.Append(kvp.Value); sb.AppendLine();
+            }
+            File.WriteAllText(saveFileDialog1.FileName, sb.ToString());
+        }
     }
 }
